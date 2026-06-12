@@ -4,7 +4,7 @@ name = "airflow-dags"
 version = "0.1.0"
 
 [tool.setuptools]
-package-dir = {"" = "dags"}
+package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
-where = ["dags"]
+where = ["."]

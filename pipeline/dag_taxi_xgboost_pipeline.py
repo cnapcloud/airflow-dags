@@ -70,10 +70,10 @@ with DAG(
         arguments=[
             "/app/step3_train.py",
             "--input", "data/raw/",
-            "--mlflow-uri", "http://mlflow.mlops.svc.cluster.local",
+            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
 
             # distributed mode
-            "--ray-address", "ray://raycluster-head-svc.default.svc.cluster.local:10001",
+            "--ray-address", "ray://raycluster-head-svc.ml.svc.cluster.local:10001",
             "--num-workers", "2",
         ],
 
@@ -93,7 +93,7 @@ with DAG(
         arguments=[
             "/app/step4_evaluate.py",
             "--test-data", "data/raw/",
-            "--mlflow-uri", "http://mlflow.mlops.svc.cluster.local",
+            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
             "--threshold", "0.0",
         ],
 
@@ -112,7 +112,7 @@ with DAG(
         cmds=["python"],
         arguments=[
             "/app/step5_register.py",
-            "--mlflow-uri", "http://mlflow.mlops.svc.cluster.local",
+            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
             "--auto-promote",
         ],
 

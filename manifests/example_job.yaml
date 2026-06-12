@@ -3,6 +3,7 @@ apiVersion: ray.io/v1
 kind: RayJob
 metadata:
   name: example-job-
+  namespace: ml
 spec:
   # 기존 RayCluster에 연결
   clusterSelector:
