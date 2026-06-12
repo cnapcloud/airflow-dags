@@ -17,9 +17,9 @@ spec:
           memory: 1Gi
           cpu: 1
       volumeMounts:
-        - name: model-data-storage
+        - name: model-data
           mountPath: /workspace/data # 데이터와 모델 가중치가 유지될 공유 볼륨
   volumes:
-    - name: model-data-storage
+    - name: model-data
       persistentVolumeClaim:
         claimName: lora-data-pvc # 쿠버네티스에 미리 생성된 PVC 이름
