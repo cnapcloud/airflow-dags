@@ -1,4 +1,13 @@
-"""Airflow DAG that runs each stage in a Kubernetes pod."""
+"""
+Airflow DAG that runs each stage in a Kubernetes pod.
+
+1. Kubernetes Secret을 환경 변수로 매핑
+   kubectl -n ml create secret generic hf-secret \
+   --from-literal=HF_TOKEN=your_hf_token
+2. lora-data-pvc PVC 생성 (이미 존재한다면 생략)
+3. ML 전용 노드에 Role 지정
+   kubectl label node <worker-node> node-role.kubernetes.io/ml=true
+"""
 
 from __future__ import annotations
 
@@ -12,12 +21,7 @@ from kubernetes.client import models as k8s
 
 
 def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None) -> KubernetesPodOperator:
-    
-    """
-     Kubernetes Secret을 환경 변수로 매핑
-     kubectl -n ml create secret generic hf-secret \
-     --from-literal=HF_TOKEN=your_hf_token
-    """
+
     secret_env = k8s.V1EnvVar(
         name="HF_TOKEN",
         value_from=k8s.V1EnvVarSource(
