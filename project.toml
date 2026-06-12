@@ -1,0 +1,10 @@
+# pyproject.toml
+[project]
+name = "airflow-dags"
+version = "0.1.0"
+
+[tool.setuptools]
+package-dir = {"" = "dags"}
+
+[tool.setuptools.packages.find]
+where = ["dags"]
