@@ -15,8 +15,8 @@ def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None
     
     """
      Kubernetes Secret을 환경 변수로 매핑
-     kubectl  create secret generic hf-secret \
-     --from-literal=HF_TOKEN=your_hf_token -n mlops
+     kubectl -n ml create secret generic hf-secret \
+     --from-literal=HF_TOKEN=your_hf_token
     """
     secret_env = k8s.V1EnvVar(
         name="HF_TOKEN",
@@ -39,24 +39,26 @@ def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None
     volume = k8s.V1Volume(
         name="my-pvc-volume",
         persistent_volume_claim=k8s.V1PersistentVolumeClaimVolumeSource(
-            claim_name="lora-training-pvc"   # 실제 쿠버네티스에 생성되어 있는 PVC 이름
+            claim_name="lora-data-pvc"   # 실제 쿠버네티스에 생성되어 있는 PVC 이름
         )
     )
     
     hf_homn_env = k8s.V1EnvVar(name="HF_HOME", value="/mnt/data/hf_home")
     airflow_env = k8s.V1EnvVar(name="AIRFLOW", value="True")
+    config_env = k8s.V1EnvVar(name="CONFIG", value="dev")
     
     return KubernetesPodOperator(
         task_id=task_id,
         name=task_id.replace("_", "-"),
-        namespace=os.getenv("MLOPS_AIRFLOW_NAMESPACE", "default"),
-        image=os.getenv("MLOPS_PIPELINE_IMAGE", "cnapcloud/lora-pipeline:latest"),
+        namespace=os.getenv("MLOPS_AIRFLOW_NAMESPACE", "ml"),
+        image=os.getenv("MLOPS_PIPELINE_IMAGE", "cnapcloud/llama-3.2-1b-lora:latest"),
         cmds=["python"],
         arguments=["-m", f"wrappers.{module_name}", *(arguments or [])],
         env_vars=[
             secret_env,
             hf_homn_env,
-            airflow_env
+            airflow_env,
+            config_env
         ],
         get_logs=True,
         is_delete_operator_pod=True,
