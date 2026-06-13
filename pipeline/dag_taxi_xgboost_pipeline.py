@@ -1,14 +1,37 @@
+"""
+Airflow DAG that runs each stage in a Kubernetes pod.
+
+1. ML 전용 노드에 Role 지정
+   kubectl label node <worker-node> node-role.kubernetes.io/ml=true
+2. 컨테이너 이미지 준비: cnapcloud/taxi-xgboost:latest
+3. MLflow 서버: mlflow.ml.svc.cluster.local
+4. Ray Cluster: raycluster-head-svc.ml.svc.cluster.local:10001
+"""
+
+from __future__ import annotations
+
+import os
 from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
 
-IMAGE = "cnapcloud/nyc-mlops:latest"
-
-default_args = {
-    "owner": "mlops",
-}
+def _pod_task(task_id: str, arguments: list[str]) -> KubernetesPodOperator:
+    return KubernetesPodOperator(
+        task_id=task_id,
+        name=task_id.replace("_", "-"),
+        namespace=os.getenv("MLOPS_AIRFLOW_NAMESPACE", "ml"),
+        image=os.getenv("MLOPS_PIPELINE_IMAGE", "cnapcloud/taxi-xgboost:latest"),
+        cmds=["python"],
+        arguments=arguments,
+        get_logs=True,
+        is_delete_operator_pod=True,
+        image_pull_policy=os.getenv("MLOPS_PIPELINE_IMAGE_PULL_POLICY", "Always"),
+        node_selector={"node-role.kubernetes.io/ml": "true"},
+        logging_interval=3,
+        startup_timeout_seconds=600,
+    )
 
 
 with DAG(
@@ -16,110 +39,40 @@ with DAG(
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
-    default_args=default_args,
+    default_args={"owner": "mlops"},
     tags=["mlops", "xgboost", "ray"],
 ) as dag:
+    analyze = _pod_task("step1_analyze", [
+        "/app/step1_analyze.py",
+        "--input", "data/raw/",
+        "--output", "reports/analysis",
+    ])
 
-    # Step 1
-    analyze = KubernetesPodOperator(
-        task_id="step1_analyze",
-        name="step1-analyze",
-        namespace="default",
+    validate = _pod_task("step2_validate", [
+        "/app/step2_validate.py",
+        "--input", "data/raw/",
+        "--output", "reports/validation",
+    ])
 
-        image=IMAGE,
+    train = _pod_task("step3_train", [
+        "/app/step3_train.py",
+        "--input", "data/raw/",
+        "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
+        "--ray-address", "ray://raycluster-head-svc.ml.svc.cluster.local:10001",
+        "--num-workers", "2",
+    ])
 
-        cmds=["python"],
-        arguments=[
-            "/app/step1_analyze.py",
-            "--input", "data/raw/",
-            "--output", "reports/analysis",
-        ],
+    evaluate = _pod_task("step4_evaluate", [
+        "/app/step4_evaluate.py",
+        "--test-data", "data/raw/",
+        "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
+        "--threshold", "0.0",
+    ])
 
-        get_logs=True,
-        is_delete_operator_pod=True,
-    )
-
-    # Step 2
-    validate = KubernetesPodOperator(
-        task_id="step2_validate",
-        name="step2-validate",
-        namespace="default",
-
-        image=IMAGE,
-
-        cmds=["python"],
-        arguments=[
-            "/app/step2_validate.py",
-            "--input", "data/raw/",
-            "--output", "reports/validation",
-        ],
-
-        get_logs=True,
-        is_delete_operator_pod=True,
-    )
-
-    # Step 3
-    train = KubernetesPodOperator(
-        task_id="step3_train",
-        name="step3-train",
-        namespace="default",
-
-        image=IMAGE,
-
-        cmds=["python"],
-        arguments=[
-            "/app/step3_train.py",
-            "--input", "data/raw/",
-            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
-
-            # distributed mode
-            "--ray-address", "ray://raycluster-head-svc.ml.svc.cluster.local:10001",
-            "--num-workers", "2",
-        ],
-
-        get_logs=True,
-        is_delete_operator_pod=True,
-    )
-
-    # Step 4
-    evaluate = KubernetesPodOperator(
-        task_id="step4_evaluate",
-        name="step4-evaluate",
-        namespace="default",
-
-        image=IMAGE,
-
-        cmds=["python"],
-        arguments=[
-            "/app/step4_evaluate.py",
-            "--test-data", "data/raw/",
-            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
-            "--threshold", "0.0",
-        ],
-
-        get_logs=True,
-        is_delete_operator_pod=True,
-    )
-
-    # Step 5
-    register = KubernetesPodOperator(
-        task_id="step5_register",
-        name="step5-register",
-        namespace="default",
-
-        image=IMAGE,
-
-        cmds=["python"],
-        arguments=[
-            "/app/step5_register.py",
-            "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
-            "--auto-promote",
-        ],
-
-        get_logs=True,
-        is_delete_operator_pod=True,
-        logging_interval=3,
-        startup_timeout_seconds=600,
-    )
+    register = _pod_task("step5_register", [
+        "/app/step5_register.py",
+        "--mlflow-uri", "http://mlflow.ml.svc.cluster.local",
+        "--auto-promote",
+    ])
 
     analyze >> validate >> train >> evaluate >> register

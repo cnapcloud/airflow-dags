@@ -16,7 +16,8 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from airflow.providers.standard.operators.python import ShortCircuitOperator
+from airflow.exceptions import AirflowException
+from airflow.providers.standard.operators.python import PythonOperator, ShortCircuitOperator
 from kubernetes.client import models as k8s
 
 
@@ -70,13 +71,27 @@ def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None
         image_pull_policy=os.getenv("MLOPS_PIPELINE_IMAGE_PULL_POLICY", "Always"),
         volumes=[volume],
         volume_mounts=[volume_mount],
-        node_selector={"node-role.kubernetes.io/ml": ""},
+        node_selector={"node-role.kubernetes.io/ml": "true"},
         logging_interval=3,
         startup_timeout_seconds=600,
     )
 
+
+def _check_validation(**context):
+    result = context["ti"].xcom_pull(task_ids="validation")
+    if result is None:
+        raise AirflowException("Validation task returned no result")
+    if isinstance(result, str):
+        import json
+        result = json.loads(result)
+    if result.get("status") == "failed":
+        raise AirflowException(f"Validation failed: {result.get('error', result)}")
+
+
 def _check_promoted(**context):
     result = context["ti"].xcom_pull(task_ids="evaluate")
+    if result is None:
+        return False
     if isinstance(result, str):
         import json
         result = json.loads(result)
@@ -93,16 +108,20 @@ with DAG(
     seed = _pod_task("seed", "airflow_seed")
     analysis = _pod_task("analysis", "airflow_analysis")
     validation = _pod_task("validation", "airflow_validation")
-    train = _pod_task("train", "airflow_train")
-    check_promote = ShortCircuitOperator(
-        task_id="check_promote",
-        python_callable=_check_promoted,
+    check_validation = PythonOperator(
+        task_id="check_validation",
+        python_callable=_check_validation,
     )
+    train = _pod_task("train", "airflow_train")
     evaluate = _pod_task(
         "evaluate",
         "airflow_eval",
         arguments=["{{ ti.xcom_pull(task_ids='train') | tojson }}"],
     )
+    check_promote = ShortCircuitOperator(
+        task_id="check_promote",
+        python_callable=_check_promoted,
+    )
     promote = _pod_task("promote", "airflow_promote")
 
-    seed >> analysis >> validation >> train >> evaluate >> check_promote >>  promote
+    seed >> analysis >> validation >> check_validation >> train >> evaluate >> check_promote >> promote
