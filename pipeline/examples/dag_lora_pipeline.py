@@ -1,3 +1,11 @@
+"""
+lora 학습을 위한 Airflow DAG 예시 파이프라인
+데이터 분석, 전처리, 학습, 평가, 등록의 각 단계가 KubernetesPodOperator로 실행
+
+파이프라인 실행전에 lora-data-pvc PVC 생성 (이미 존재한다면 생략)
+"""
+
+
 import datetime
 import os
 import json
