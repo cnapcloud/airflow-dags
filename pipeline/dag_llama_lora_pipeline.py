@@ -71,6 +71,9 @@ def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None
         image_pull_policy=os.getenv("MLOPS_PIPELINE_IMAGE_PULL_POLICY", "Always"),
         volumes=[volume],
         volume_mounts=[volume_mount],
+        tolerations=[
+            k8s.V1Toleration(key="ml", operator="Exists", effect="NoSchedule"),
+        ],
         logging_interval=3,
         startup_timeout_seconds=600,
     )
