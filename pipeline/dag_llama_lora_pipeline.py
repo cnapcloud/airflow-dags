@@ -74,6 +74,7 @@ def _pod_task(task_id: str, module_name: str, arguments: list[str] | None = None
         tolerations=[
             k8s.V1Toleration(key="ml", operator="Exists", effect="NoSchedule"),
         ],
+        node_selector={"node-role.kubernetes.io/ml": ""},
         logging_interval=3,
         startup_timeout_seconds=600,
     )
