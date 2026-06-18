@@ -15,7 +15,7 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-
+from kubernetes.client import models as k8s
 
 def _pod_task(task_id: str, arguments: list[str]) -> KubernetesPodOperator:
     return KubernetesPodOperator(
@@ -28,6 +28,9 @@ def _pod_task(task_id: str, arguments: list[str]) -> KubernetesPodOperator:
         get_logs=True,
         is_delete_operator_pod=True,
         image_pull_policy=os.getenv("MLOPS_PIPELINE_IMAGE_PULL_POLICY", "Always"),
+        tolerations=[
+            k8s.V1Toleration(key="ml", operator="Exists", effect="NoSchedule"),
+        ],
         node_selector={"node-role.kubernetes.io/ml": "true"},
         logging_interval=3,
         startup_timeout_seconds=600,
