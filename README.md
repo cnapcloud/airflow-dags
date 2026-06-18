@@ -19,12 +19,12 @@ Kubernetes 환경에서 ML 파이프라인을 실행하는 Airflow DAG 모음입
 - 워커 스펙: CPU 6코어 / 메모리 16GB / 디스크 40GB
 
 **실행 중인 인프라** (`ml` 네임스페이스)
-- Airflow (Celery executor) — scheduler, worker, triggerer, redis, postgresql
+- Airflow (Celery executor) — api-server, dag-processor, scheduler, worker, triggerer, redis, postgresql, statsd
 - MLflow — 실험 추적 및 모델 레지스트리 (postgresql 백엔드)
 - KubeRay — RayCluster 오퍼레이터
 - RayCluster — head 1개, worker 최대 2개 (오토스케일)
   - head: CPU 2코어 / 메모리 4Gi (request 200m / 2Gi)
-  - worker: CPU 4코어 / 메모리 8Gi (request 2코어 / 4Gi) / object-store 4GB
+  - worker: CPU 2코어 / 메모리 8Gi (request 1코어 / 8Gi)
 
 **모니터링** (`infra` 네임스페이스)
 - Prometheus + Grafana + Alertmanager
