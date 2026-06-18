@@ -12,9 +12,10 @@ Kubernetes 환경에서 ML 파이프라인을 실행하는 Airflow DAG 모음입
 - SSH 접근: `multipass shell <node-name>`
 
 **노드**
-- `master-1` (192.168.252.4) — control-plane, etcd
-- `worker-1` (192.168.252.3) — ML 워크로드 전용 (`node-role.kubernetes.io/ml=true`)
-- `worker-2` (192.168.252.5) — 범용 워크로드
+- `master-1` (192.168.0.231) — control-plane, etcd, taint: `node-role.kubernetes.io/control-plane:NoSchedule`
+- `worker-1` (192.168.0.232) — 범용 워크로드
+- `worker-2` (192.168.0.233) — ML 워크로드 전용 (`node-role.kubernetes.io/ml=true`), taint: `ml:NoSchedule`
+- `worker-3` (192.168.0.234) — AV 워크로드 전용 (`node-role.kubernetes.io/av=`)
 - 워커 스펙: CPU 6코어 / 메모리 16GB / 디스크 40GB
 
 **실행 중인 인프라** (`ml` 네임스페이스)
